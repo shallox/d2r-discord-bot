@@ -39,13 +39,14 @@ DCLONE_D2RW_TOKEN = environ.get('DCLONE_D2RW_TOKEN')
 # DClone tracker API (Optional)
 # Defaults to All Regions, Ladder and Non-Ladder, Softcore
 DCLONE_REGION = environ.get('DCLONE_REGION', '')  # 1 for Americas, 2 for Europe, 3 for Asia, blank for all
-DCLONE_LADDER = environ.get('DCLONE_LADDER', '')  # 1 for Ladder, 2 for Non-Ladder, blank for all
+DCLONE_LADDER = environ.get('DCLONE_LADDER', '1')  # 1 for Ladder, 2 for Non-Ladder, blank for all
 DCLONE_HC = environ.get('DCLONE_HC', '2')  # 1 for Hardcore, 2 for Softcore, blank for all
 
 # Bot specific (Optional)
 # Defaults to alerting at level 3 if the last 3 progress reports match
 DCLONE_THRESHOLD = int(environ.get('DCLONE_THRESHOLD', 3))  # progress level to alert at (and above)
-DCLONE_REPORTS = int(environ.get('DCLONE_REPORTS', 3))  # number of matching reports required before alerting (reduces trolling)
+DCLONE_REPORTS = int(
+    environ.get('DCLONE_REPORTS', 3))  # number of matching reports required before alerting (reduces trolling)
 
 ########################
 # End of configuration #
@@ -56,6 +57,8 @@ LADDER = {'1': 'Ladder', '2': 'Non-Ladder', '': 'Ladder and Non-Ladder'}
 LADDER_RW = {True: 'Ladder', False: 'Non-Ladder'}
 HC = {'1': 'Hardcore', '2': 'Softcore', '': 'Hardcore and Softcore'}
 HC_RW = {True: 'Hardcore', False: 'Softcore'}
+dt_hour_last = None
+last_update = None
 
 # DCLONE_DISCORD_TOKEN and DCLONE_DISCORD_CHANNEL_ID are required
 if not DCLONE_DISCORD_TOKEN or DCLONE_DISCORD_CHANNEL_ID == 0:
@@ -65,8 +68,9 @@ if not DCLONE_DISCORD_TOKEN or DCLONE_DISCORD_CHANNEL_ID == 0:
 
 class D2RuneWizardClient():
     """
-    Interacts with the d2runewizard.com API to get planned walks.
+    Interacts with the d2runewizard.com API to get planned walks and terror zones.
     """
+
     @staticmethod
     def emoji(region='', ladder='', hardcore=''):
         """
@@ -128,11 +132,39 @@ class D2RuneWizardClient():
 
         return walks
 
+    @staticmethod
+    def terror_zone():
+        """
+        Returns latest terror zone info.
+
+        :return: string of walk information.
+        """
+        terror_zone_data = get(
+            f'https://d2runewizard.com/api/terror-zone?token={DCLONE_D2RW_TOKEN}',
+            timeout=10).json()
+        terror_info = dict(terror_zone_data)["terrorZone"]
+        tz = terror_info["zone"]
+        alt_tz = ''
+        global last_update
+        last_update = datetime.fromtimestamp(terror_info["lastUpdate"]["seconds"])
+        for zone in terror_info['reportedZones'].keys():
+            if tz == zone:
+                alt_tz += f'\nNo alternate zones reported.'
+            else:
+                alt_tz += f'\nReported Zone: {zone}\nPositive reports: {terror_info["reportedZones"]}'
+        reply = f'Current terror zone: {tz}\n' \
+                f'Last report @: {last_update}\n' \
+                f'Positive reports: {terror_info["highestProbabilityZone"]["amount"]}\n' \
+                f'Probability zone is correct: {terror_info["highestProbabilityZone"]["probability"]}\n' \
+                f'Disputed terror zone: {alt_tz}'
+        return reply
+
 
 class Diablo2IOClient():
     """
     Interacts with the diablo2.io dclone API. Tracks the current progress and recent reports for each mode.
     """
+
     def __init__(self):
         # Current progress (last alerted) for each mode
         self.current_progress = {
@@ -254,7 +286,9 @@ class Diablo2IOClient():
         # TODO: move to D2RuneWizardClient
         if DCLONE_D2RW_TOKEN:
             try:
-                response = get(f'https://d2runewizard.com/api/diablo-clone-progress/planned-walks?token={DCLONE_D2RW_TOKEN}', timeout=10)
+                response = get(
+                    f'https://d2runewizard.com/api/diablo-clone-progress/planned-walks?token={DCLONE_D2RW_TOKEN}',
+                    timeout=10)
                 response.raise_for_status()
 
                 # filter planned walks to configured mode and add relevant ones to the message
@@ -307,6 +341,7 @@ class DiscordClient(discord.Client):
     When a progress change occurs that is greater than or equal to DCLONE_THRESHOLD and for more than DCLONE_REPORTS
     consecutive updates, the bot will send a message to the configured DCLONE_DISCORD_CHANNEL_ID.
     """
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
@@ -344,12 +379,17 @@ class DiscordClient(discord.Client):
         """
         This is called any time the bot receives a message. It implements the dclone chatop.
         """
+        channel = self.get_channel(message.channel.id)
         if message.content.startswith('.dclone') or message.content.startswith('!dclone'):
             print(f'Responding to dclone chatop from {message.author}')
             current_status = self.dclone.progress_message()
-
-            channel = self.get_channel(message.channel.id)
             await channel.send(current_status)
+        elif message.content.startswith('!tz'):
+            print(f'Providing Terror Zone info to {message.author}')
+            await channel.send(D2RuneWizardClient.terror_zone())
+        elif message.content.startswith('!help'):
+            await channel.send(f'Commands are:\n!dclone | Displays the latest Dclone info including planned walks.\n'
+                               f'!tz | Sisplays the latest Terror Zone info.\n!help | ...Provides a clue -.0')
 
     @tasks.loop(seconds=60)
     async def check_dclone_status(self):
@@ -380,8 +420,10 @@ class DiscordClient(discord.Client):
 
             # handle progress changes
             # TODO: bundle multiple changes into one message?
-            if int(progress) >= DCLONE_THRESHOLD and progress > progress_was and self.dclone.should_update((region, ladder, hardcore)):
-                print(f'{REGION[region]} {LADDER[ladder]} {HC[hardcore]} is now {progress}/6 (was {progress_was}/6) (reporter_id: {reporter_id})')
+            if int(progress) >= DCLONE_THRESHOLD and progress > progress_was and self.dclone.should_update(
+                    (region, ladder, hardcore)):
+                print(
+                    f'{REGION[region]} {LADDER[ladder]} {HC[hardcore]} is now {progress}/6 (was {progress_was}/6) (reporter_id: {reporter_id})')
 
                 # post to discord
                 message = f'[{progress}/6] {emoji} **{REGION[region]} {LADDER[ladder]} {HC[hardcore]}** DClone progressed (reporter_id: {reporter_id})'
@@ -395,7 +437,8 @@ class DiscordClient(discord.Client):
             elif progress < progress_was and self.dclone.should_update((region, ladder, hardcore)):
                 # progress increases are interesting, but we also need to reset to 1 after dclone spawns
                 # and to roll it back if the new confirmed progress is less than the current progress
-                print(f'[RollBack] {REGION[region]} {LADDER[ladder]} {HC[hardcore]} rolling back to {progress} (reporter_id: {reporter_id})')
+                print(
+                    f'[RollBack] {REGION[region]} {LADDER[ladder]} {HC[hardcore]} rolling back to {progress} (reporter_id: {reporter_id})')
 
                 # if we believe dclone spawned, post to discord
                 if progress == 1:
@@ -417,7 +460,9 @@ class DiscordClient(discord.Client):
         # check for upcoming walks using the D2RuneWizard API
         if DCLONE_D2RW_TOKEN:
             try:
-                response = get(f'https://d2runewizard.com/api/diablo-clone-progress/planned-walks?token={DCLONE_D2RW_TOKEN}', timeout=10)
+                response = get(
+                    f'https://d2runewizard.com/api/diablo-clone-progress/planned-walks?token={DCLONE_D2RW_TOKEN}',
+                    timeout=10)
                 response.raise_for_status()
 
                 walks = D2RuneWizardClient.filter_walks(response.json().get('walks'))
@@ -436,7 +481,8 @@ class DiscordClient(discord.Client):
                         unconfirmed = ' [UNCONFIRMED]' if walk.get('unconfirmed') else ''
 
                         # post to discord
-                        print(f'[PlannedWalk] {region} {LADDER_RW[ladder]} {HC_RW[hardcore]} reported by {name} in {walk_in_mins}m {unconfirmed}')
+                        print(
+                            f'[PlannedWalk] {region} {LADDER_RW[ladder]} {HC_RW[hardcore]} reported by {name} in {walk_in_mins}m {unconfirmed}')
                         message = f'{emoji} Upcoming walk for **{region} {LADDER_RW[ladder]} {HC_RW[hardcore]}** '
                         message += f'starts at <t:{timestamp}:f> (reported by `{name}`){unconfirmed}'
                         message += '\n> Data courtesy of d2runewizard.com'
@@ -447,6 +493,27 @@ class DiscordClient(discord.Client):
                         self.dclone.alerted_walks.append(walk_id)
             except Exception as err:
                 print(f'[PlannedWalk] D2RuneWizard API Error: {err}')
+            global dt_hour_last
+            this_hour = datetime.now()
+            if dt_hour_last is None and last_update is None:
+                channel = self.get_channel(DCLONE_DISCORD_CHANNEL_ID)
+                dt_hour_last = datetime.now()
+                await channel.send(f'{D2RuneWizardClient.terror_zone()}')
+            elif dt_hour_last.hour == this_hour.hour:
+                if last_update.hour == this_hour.hour:
+                    pass
+                else:
+                    channel = self.get_channel(DCLONE_DISCORD_CHANNEL_ID)
+                    dt_hour_last = datetime.hour
+                    await channel.send(f'{D2RuneWizardClient.terror_zone()}')
+            elif dt_hour_last != this_hour:
+                msg_data = D2RuneWizardClient.terror_zone()
+                if last_update.hour == this_hour.hour:
+                    channel = self.get_channel(DCLONE_DISCORD_CHANNEL_ID)
+                    dt_hour_last = datetime.now()
+                    await channel.send(f'{msg_data}')
+                else:
+                    pass
 
     @check_dclone_status.before_loop
     async def before_check_dclone_status(self):
@@ -476,7 +543,8 @@ class DiscordClient(discord.Client):
             # set current progress and report
             self.dclone.current_progress[(region, ladder, hardcore)] = progress
             if progress != 1:
-                print(f'Progress for {REGION[region]} {LADDER[ladder]} {HC[hardcore]} starting at {progress}/6 (reporter_id: {reporter_id})')
+                print(
+                    f'Progress for {REGION[region]} {LADDER[ladder]} {HC[hardcore]} starting at {progress}/6 (reporter_id: {reporter_id})')
 
             # populate the report cache with DCLONE_REPORTS number of reports at this progress
             for _ in range(0, DCLONE_REPORTS):
