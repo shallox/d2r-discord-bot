@@ -389,7 +389,7 @@ class DiscordClient(discord.Client):
             await channel.send(D2RuneWizardClient.terror_zone())
         elif message.content.startswith('!help'):
             await channel.send(f'Commands are:\n!dclone | Displays the latest Dclone info including planned walks.\n'
-                               f'!tz | Sisplays the latest Terror Zone info.\n!help | ...Provides a clue -.0')
+                               f'!tz | Displays the latest Terror Zone info.\n!help | ...Provides a clue -.0')
 
     @tasks.loop(seconds=60)
     async def check_dclone_status(self):
