@@ -1,10 +1,10 @@
-# dclone-discord
+# d2r-discord-plugin
 
 ![](https://img.shields.io/badge/version-0.11-blue)
 
-A Discord bot for reporting [DClone Tracker](https://diablo2.io/dclonetracker.php) progress changes and upcoming [planned walks](https://d2runewizard.com/diablo-clone-tracker#planned-walks) for Diablo 2: Resurrected. By default it will report any progress changes at or above level 2 for All Regions, Ladder and Non-Ladder, Softcore and planned walks an hour before they start.
+A Discord bot for reporting [DClone Tracker](https://diablo2.io/dclonetracker.php) progress changes, upcoming [planned walks](https://d2runewizard.com/diablo-clone-tracker#planned-walks) and [Terror Zone](https://d2runewizard.com/api/terror-zone) info for Diablo 2: Resurrected. By default it will report any progress changes at or above level 2 for All Regions, Ladder and Non-Ladder, Softcore and planned walks an hour before they start. Also, every hour it will report on the latest Terror Zone.
 
-You can also get the current progress for tracked regions and planned walks by typing `.dclone` or `!dclone` in chat.
+You can also get a list of avalable commands by typing !help in the chatt.
 
 ## Usage
 
@@ -27,7 +27,7 @@ Configuration is done via environment variables, or you can edit the variables n
  - `DCLONE_DISCORD_CHANNEL_ID`: The [channel id](https://support.discord.com/hc/en-us/articles/206346498-Where-can-I-find-my-User-Server-Message-ID-) to send messages to.
 
 **Optional**
- - `DCLONE_D2RW_TOKEN` (**Highly Recommended**): Token for querying d2runewizard.com, required if you want planned walk information. Request one [here](https://d2runewizard.com/integration).
+ - `DCLONE_D2RW_TOKEN` (**Highly Recommended**): Token for querying d2runewizard.com, required if you want planned walk information as well as terror zone information. Request one [here](https://d2runewizard.com/integration).
  - `DCLONE_REGION`: `1` for Americas, `2` for Europe, `3` for Asia, blank **(Default)** for All Regions.
  - `DCLONE_LADDER`: `1` for Ladder, `2` for Non-Ladder, blank **(Default)** for both.
  - `DCLONE_HC`: `1` for Harcore, `2` for Softcore **(Default)**, blank for both.
