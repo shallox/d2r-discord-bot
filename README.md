@@ -1,4 +1,4 @@
-# d2r-discord-plugin
+# d2r-discord-bot
 
 ![](https://img.shields.io/badge/version-0.11-blue)
 
