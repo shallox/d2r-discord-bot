@@ -41,3 +41,4 @@ Start the bot with `python3 d2r-discord-bot.py`.
 ## Disclaimer
 
 Data courtesy of [diablo2.io](https://diablo2.io) and [d2runewizard.com](https://d2runewizard.com).
+Base code courtesy of [Synse](https://github.com/Synse/dclone-discord)
