@@ -149,14 +149,17 @@ class D2RuneWizardClient():
         last_update = datetime.fromtimestamp(terror_info["lastUpdate"]["seconds"])
         for zone in terror_info['reportedZones'].keys():
             if len(terror_info['reportedZones'].keys()) <= 1:
-                alt_tz += f'\nNo alternate zones reported.'
+                alt_tz += f'\n:diablo72:No alternate zones reported.'
             else:
-                alt_tz += f'\nReported Zone: {zone}\nPositive reports: {terror_info["reportedZones"]}'
-        reply = f':skull_crossbones: Current terror zone: {tz}\n' \
-                f':skull_crossbones: Last report @: {last_update}\n' \
-                f':skull_crossbones: Positive reports: {terror_info["highestProbabilityZone"]["amount"]}\n' \
-                f':skull_crossbones: Probability zone is correct: {terror_info["highestProbabilityZone"]["probability"]}\n' \
-                f':skull_crossbones: Disputed terror zone: {alt_tz}'
+                alt_tz += f'\n:diablo72:Reported Zone: {zone}\nPositive reports: {terror_info["reportedZones"]}'
+        reply = f':skull_crossbones::skull_crossbones::skull_crossbones::skull_crossbones::skull_crossbones:\n' \
+                f':diablo72:Current terror zone: {tz}\n' \
+                f':diablo72:Last report @: {last_update}\n' \
+                f':diablo72:Positive reports: {terror_info["highestProbabilityZone"]["amount"]}\n' \
+                f':diablo72:Probability zone is correct: {terror_info["highestProbabilityZone"]["probability"]}\n' \
+                f':diablo72:Disputed terror zone: {alt_tz}' \
+                f':sadcatth: Data courtesy of d2runewizard.com\n' \
+                f':skull_crossbones::skull_crossbones::skull_crossbones::skull_crossbones::skull_crossbones:'
         return reply
 
 
