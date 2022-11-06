@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """
-A Discord Bot for tracking DClone spawns in Diablo 2: Resurrected - https://github.com/Synse/discord-dclone
-Copyright (C) 2022 @Synse
+A Discord Bot for tracking DClone spawns and Terror Zones in Diablo 2: Resurrected - https://github.com/shallox/d2r-discord-bot
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
