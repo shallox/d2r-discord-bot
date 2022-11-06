@@ -50,7 +50,7 @@ DCLONE_REPORTS = int(
 ########################
 # End of configuration #
 ########################
-__version__ = '0.10'
+__version__ = '0.1a'
 REGION = {'1': 'Americas', '2': 'Europe', '3': 'Asia', '': 'All Regions'}
 LADDER = {'1': 'Ladder', '2': 'Non-Ladder', '': 'Ladder and Non-Ladder'}
 LADDER_RW = {True: 'Ladder', False: 'Non-Ladder'}
@@ -156,7 +156,7 @@ class D2RuneWizardClient():
                 f'Last report @: {last_update}\n' \
                 f'Positive reports: {terror_info["highestProbabilityZone"]["amount"]}\n' \
                 f'Probability zone is correct: {terror_info["highestProbabilityZone"]["probability"]}\n' \
-                f'Disputed terror zone: {alt_tz}' \
+                f'Disputed terror zone: {alt_tz}\n' \
                 f':sadcatth: Data courtesy of d2runewizard.com\n' \
                 f':skull_crossbones::skull_crossbones::skull_crossbones::skull_crossbones::skull_crossbones::skull_crossbones::skull_crossbones::skull_crossbones::skull_crossbones::skull_crossbones:'
         return reply
