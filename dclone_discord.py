@@ -148,15 +148,15 @@ class D2RuneWizardClient():
         global last_update
         last_update = datetime.fromtimestamp(terror_info["lastUpdate"]["seconds"])
         for zone in terror_info['reportedZones'].keys():
-            if tz == zone:
+            if len(terror_info['reportedZones'].keys()) <= 1:
                 alt_tz += f'\nNo alternate zones reported.'
             else:
                 alt_tz += f'\nReported Zone: {zone}\nPositive reports: {terror_info["reportedZones"]}'
-        reply = f'Current terror zone: {tz}\n' \
-                f'Last report @: {last_update}\n' \
-                f'Positive reports: {terror_info["highestProbabilityZone"]["amount"]}\n' \
-                f'Probability zone is correct: {terror_info["highestProbabilityZone"]["probability"]}\n' \
-                f'Disputed terror zone: {alt_tz}'
+        reply = f':skull_crossbones: Current terror zone: {tz}\n' \
+                f':skull_crossbones: Last report @: {last_update}\n' \
+                f':skull_crossbones: Positive reports: {terror_info["highestProbabilityZone"]["amount"]}\n' \
+                f':skull_crossbones: Probability zone is correct: {terror_info["highestProbabilityZone"]["probability"]}\n' \
+                f':skull_crossbones: Disputed terror zone: {alt_tz}'
         return reply
 
 
