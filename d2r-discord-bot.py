@@ -148,9 +148,9 @@ class D2RuneWizardClient():
         last_update = datetime.fromtimestamp(terror_info["lastUpdate"]["seconds"])
         for zone in terror_info['reportedZones'].keys():
             if len(terror_info['reportedZones'].keys()) <= 1:
-                alt_tz += f'\n:diablo72:No alternate zones reported.'
+                alt_tz += f'\nNo alternate zones reported.'
             else:
-                alt_tz += f'\n:diablo72:Reported Zone: {zone}\nPositive reports: {terror_info["reportedZones"]}'
+                alt_tz += f'\nReported Zone: {zone}\nPositive reports: {terror_info["reportedZones"]}'
         reply = f':skull_crossbones::skull_crossbones::skull_crossbones::skull_crossbones::skull_crossbones::skull_crossbones::skull_crossbones::skull_crossbones::skull_crossbones::skull_crossbones:\n' \
                 f'Current terror zone: {tz}\n' \
                 f'Last report @: {last_update}\n' \
