@@ -16,7 +16,7 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 from datetime import datetime
-from os import environ
+from os import environ, path
 from time import time
 from requests import get
 from discord.ext import tasks
@@ -50,7 +50,7 @@ DCLONE_REPORTS = int(
 ########################
 # End of configuration #
 ########################
-__version__ = '0.10'
+__version__ = '0.1b'
 REGION = {'1': 'Americas', '2': 'Europe', '3': 'Asia', '': 'All Regions'}
 LADDER = {'1': 'Ladder', '2': 'Non-Ladder', '': 'Ladder and Non-Ladder'}
 LADDER_RW = {True: 'Ladder', False: 'Non-Ladder'}
@@ -58,6 +58,19 @@ HC = {'1': 'Hardcore', '2': 'Softcore', '': 'Hardcore and Softcore'}
 HC_RW = {True: 'Hardcore', False: 'Softcore'}
 dt_hour_last = None
 last_update = None
+
+if path.isfile('email.txt'):
+    efr = open('email.txt', 'r').read()
+else:
+    with open('email.txt', 'w') as efr_w:
+        efr = input(
+            'https://d2runewizard.com needs an email in order to authenticate to its api, please enter one:')
+        efr_w.write(efr)
+headers = {
+    "D2R-Contact": efr,
+    "D2R-Platform": "Discord",
+    "D2R-Repo": "https://github.com/shallox/d2r-discord-bot"
+}
 
 # DCLONE_DISCORD_TOKEN and DCLONE_DISCORD_CHANNEL_ID are required
 if not DCLONE_DISCORD_TOKEN or DCLONE_DISCORD_CHANNEL_ID == 0:
@@ -140,6 +153,7 @@ class D2RuneWizardClient():
         """
         terror_zone_data = get(
             f'https://d2runewizard.com/api/terror-zone?token={DCLONE_D2RW_TOKEN}',
+            headers=headers,
             timeout=10).json()
         terror_info = dict(terror_zone_data)["terrorZone"]
         tz = terror_info["zone"]
@@ -156,7 +170,7 @@ class D2RuneWizardClient():
                 f':diablo72:Last report @: {last_update}\n' \
                 f':diablo72:Positive reports: {terror_info["highestProbabilityZone"]["amount"]}\n' \
                 f':diablo72:Probability zone is correct: {terror_info["highestProbabilityZone"]["probability"]}\n' \
-                f':diablo72:Disputed terror zone: {alt_tz}' \
+                f':diablo72:Disputed terror zone: {alt_tz}\n' \
                 f':sadcatth: Data courtesy of d2runewizard.com\n' \
                 f':skull_crossbones::skull_crossbones::skull_crossbones::skull_crossbones::skull_crossbones:'
         return reply
@@ -290,6 +304,7 @@ class Diablo2IOClient():
             try:
                 response = get(
                     f'https://d2runewizard.com/api/diablo-clone-progress/planned-walks?token={DCLONE_D2RW_TOKEN}',
+                    headers=headers,
                     timeout=10)
                 response.raise_for_status()
 
@@ -546,7 +561,8 @@ class DiscordClient(discord.Client):
             self.dclone.current_progress[(region, ladder, hardcore)] = progress
             if progress != 1:
                 print(
-                    f'Progress for {REGION[region]} {LADDER[ladder]} {HC[hardcore]} starting at {progress}/6 (reporter_id: {reporter_id})')
+                    f'Progress for {REGION[region]} {LADDER[ladder]} {HC[hardcore]} starting at {progress}/6 ('
+                    f'reporter_id: {reporter_id})')
 
             # populate the report cache with DCLONE_REPORTS number of reports at this progress
             for _ in range(0, DCLONE_REPORTS):
