@@ -71,7 +71,7 @@ else:
         efr = input('https://d2runewizard.com needs an email in order to authenticate to its api, please enter one:')
         efr_w.write(efr)
 headers = {
-    "D2R-Contact": efr,
+    "D2R-Contact": efr.replace('\n', ''),
     "D2R-Platform": "Discord",
     "D2R-Repo": "https://github.com/shallox/d2r-discord-bot"
 }
