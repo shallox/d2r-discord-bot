@@ -64,6 +64,18 @@ if not DCLONE_DISCORD_TOKEN or DCLONE_DISCORD_CHANNEL_ID == 0:
     print('Please set DCLONE_DISCORD_TOKEN and DCLONE_DISCORD_CHANNEL_ID in your environment.')
     exit(1)
 
+if path.isfile('email.txt'):
+    efr = open('email.txt', 'r').read()
+else:
+    with open('email.txt', 'w') as efr_w:
+        efr = input('https://d2runewizard.com needs an email in order to authenticate to its api, please enter one:')
+        efr_w.write(efr)
+headers = {
+    "D2R-Contact": efr,
+    "D2R-Platform": "Discord",
+    "D2R-Repo": "https://github.com/shallox/d2r-discord-bot"
+}
+
 
 class D2RuneWizardClient():
     """
@@ -140,6 +152,7 @@ class D2RuneWizardClient():
         """
         terror_zone_data = get(
             f'https://d2runewizard.com/api/terror-zone?token={DCLONE_D2RW_TOKEN}',
+            headers=headers,
             timeout=10).json()
         terror_info = dict(terror_zone_data)["terrorZone"]
         tz = terror_info["zone"]
@@ -290,6 +303,7 @@ class Diablo2IOClient():
             try:
                 response = get(
                     f'https://d2runewizard.com/api/diablo-clone-progress/planned-walks?token={DCLONE_D2RW_TOKEN}',
+                    headers=headers,
                     timeout=10)
                 response.raise_for_status()
 
