@@ -15,12 +15,18 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
-from datetime import datetime
+import asyncio
+from datetime import datetime, timedelta
+from tools import DbManager
 from os import environ, path
 from time import time
 from requests import get
 from discord.ext import tasks
 import discord
+from discord import SelectOption, Interaction, ButtonStyle, ui
+from discord.ui import View, Select, button, Modal, TextInput, Button
+from random import randint
+from hashlib import md5
 
 #####################
 # Bot Configuration #
@@ -29,7 +35,7 @@ import discord
 
 # Discord (Required)
 DCLONE_DISCORD_TOKEN = environ.get('DCLONE_DISCORD_TOKEN')
-DCLONE_DISCORD_CHANNEL_ID = int(environ.get('DCLONE_DISCORD_CHANNEL_ID', 0))
+DCLONE_DISCORD_CHANNEL_ID = int(environ.get('DCLONE_DISCORD_CHANNEL_ID'))
 
 # D2RuneWizard API (Optional but recommended)
 # This token is necessary for planned walk notifications
@@ -47,10 +53,50 @@ DCLONE_THRESHOLD = int(environ.get('DCLONE_THRESHOLD', 3))  # progress level to 
 DCLONE_REPORTS = int(
     environ.get('DCLONE_REPORTS', 3))  # number of matching reports required before alerting (reduces trolling)
 
+# Terror zone list
+EVENT_LIST = [
+  "Blood Moor and Den of Evil",
+  "Cold Plains and The Cave",
+  "Burial Grounds, The Crypt, and the Mausoleum",
+  "Stony Field",
+  "Dark Wood / Underground Passage",
+  "Black Marsh / The Hole",
+  "The Forgotten Tower",
+  "Jail / Barracks",
+  "Cathedral and Catacombs",
+  "The Pit",
+  "Tristram",
+  "Moo Moo Farm",
+  "Sewers",
+  "Rocky Waste and Stony Tomb",
+  "Dry Hills and Halls of the Dead",
+  "Far Oasis",
+  "Lost City, Valley of Snakes, and Claw Viper Temple",
+  "Ancient Tunnels",
+  "Arcane Sanctuary",
+  "Tal Rasha's Tombs",
+  "Spider Forest and Spider Cavern",
+  "Great Marsh",
+  "Flayer Jungle and Flayer Dungeon",
+  "Kurast Bazaar, Ruined Temple, and Disused Fane",
+  "Travincal",
+  "Durance of Hate",
+  "Outer Steppes and Plains of Despair",
+  "River of Flame / City of the Damned",
+  "Chaos Sanctuary",
+  "Bloody Foothills / Frigid Highlands / Abbadon",
+  "Glacial Trail / Drifter Cavern",
+  "Crystalline Passage and Frozen River",
+  "Arreat Plateau / Pit of Acheron",
+  "Nihlathak's Temple, Halls of Anguish, Halls of Pain, and Halls of Vaught",
+  "Ancient's Way and Icy Cellar",
+  "Worldstone Keep, Throne of Destruction, and Worldstone Chamber"
+]
+
 ########################
 # End of configuration #
 ########################
-__version__ = '0.1a'
+__version__ = '0.2a'
 REGION = {'1': 'Americas', '2': 'Europe', '3': 'Asia', '': 'All Regions'}
 LADDER = {'1': 'Ladder', '2': 'Non-Ladder', '': 'Ladder and Non-Ladder'}
 LADDER_RW = {True: 'Ladder', False: 'Non-Ladder'}
@@ -114,6 +160,38 @@ class D2RuneWizardClient():
         return f'{region} {ladder} {hardcore}'
 
     @staticmethod
+    def dclone_walks(message):
+        # get planned walks from d2runewizard.com API
+        if DCLONE_D2RW_TOKEN:
+            try:
+                response = get(
+                    f'https://d2runewizard.com/api/diablo-clone-progress/planned-walks?token={DCLONE_D2RW_TOKEN}',
+                    headers=headers,
+                    timeout=10)
+                response.raise_for_status()
+
+                # filter planned walks to configured mode and add relevant ones to the message
+                planned_walks = D2RuneWizardClient.filter_walks(response.json().get('walks'))
+                if len(planned_walks) > 0:
+                    message += '\n\nPlanned Walks:\n'
+                    for walk in planned_walks:
+                        region = walk.get('region')
+                        ladder = walk.get('ladder')
+                        hardcore = walk.get('hardcore')
+                        timestamp = int(walk.get('timestamp') / 1000)
+                        name = walk.get('displayName')
+                        emoji = D2RuneWizardClient.emoji(region=region, ladder=ladder, hardcore=hardcore)
+                        unconfirmed = ' **[UNCONFIRMED]**' if not walk.get('confirmed') else ''
+
+                        message += f' - {emoji} **{region} {LADDER_RW[ladder]} {HC_RW[hardcore]}** <t:{timestamp}:R> reported by `{name}`{unconfirmed}\n'
+                    message += '> Data courtesy of d2runewizard.com'
+                else:
+                    message += '\n\nPlanned Walks:\nNo planned walks found.'
+                return message
+            except Exception as err:
+                print(f'[ChatOp] D2RuneWizard API Error: {err}')
+
+    @staticmethod
     def filter_walks(walks):
         """
         Returns a filtered list of walks based on the configured mode (region, ladder, hardcore). Region TBD walks are always included.
@@ -144,34 +222,55 @@ class D2RuneWizardClient():
         return walks
 
     @staticmethod
-    def terror_zone():
+    def terror_zone(mode):
+        def tz_cache_update(hash__, data):
+            tz_cache[hash__] = data
+            db_.write_db(tz_cache)
+
         """
         Returns latest terror zone info.
 
         :return: string of walk information.
         """
+        db_ = DbManager(cache_loc='terrorzone.json')
+        tz_cache = db_.read_db()
         terror_zone_data = get(
             f'https://d2runewizard.com/api/terror-zone?token={DCLONE_D2RW_TOKEN}',
             headers=headers,
             timeout=10).json()
-        terror_info = dict(terror_zone_data)["terrorZone"]
+        terror_info = dict(terror_zone_data)["currentTerrorZone"]
+        next_terror_info = dict(terror_zone_data)['nextTerrorZone']
         tz = terror_info["zone"]
-        alt_tz = ''
+        if tz_cache:
+            tz_hash = md5(
+                f'{datetime.utcnow().replace(minute=0, second=0, microsecond=0).isoformat()}-{tz}'.encode()).hexdigest()
+            if tz_hash is not tz_cache.keys():
+                tz_cache_update(tz_hash, {'zone': tz, 'ts': datetime.utcnow().replace(minute=0, second=0,
+                                                                                      microsecond=0).isoformat() + "Z"})
+        else:
+            tz_cache_update(
+                md5(f'{datetime.utcnow().replace(minute=0, second=0, microsecond=0).isoformat()}-{tz}'.encode()).hexdigest(),
+                {'zone': tz, 'ts': datetime.utcnow().replace(minute=0, second=0, microsecond=0).isoformat() + "Z"})
+        ntz = next_terror_info['zone']
         global last_update
-        last_update = datetime.fromtimestamp(terror_info["lastUpdate"]["seconds"])
-        for zone in terror_info['reportedZones'].keys():
-            if len(terror_info['reportedZones'].keys()) <= 1:
-                alt_tz += f'\nNo alternate zones reported.'
-            else:
-                alt_tz += f'\nReported Zone: {zone}\nPositive reports: {terror_info["reportedZones"]}'
-        reply = f':skull_crossbones::skull_crossbones::skull_crossbones::skull_crossbones::skull_crossbones::skull_crossbones::skull_crossbones::skull_crossbones::skull_crossbones::skull_crossbones:\n' \
-                f'Current terror zone: {tz}\n' \
-                f'Last report @: {last_update}\n' \
-                f'Positive reports: {terror_info["highestProbabilityZone"]["amount"]}\n' \
-                f'Probability zone is correct: {terror_info["highestProbabilityZone"]["probability"]}\n' \
-                f'Disputed terror zone: {alt_tz}\n' \
-                f':sadcatth: Data courtesy of d2runewizard.com\n' \
-                f':skull_crossbones::skull_crossbones::skull_crossbones::skull_crossbones::skull_crossbones::skull_crossbones::skull_crossbones::skull_crossbones::skull_crossbones::skull_crossbones:'
+        last_update = datetime.now()
+        notifications = ''
+        if mode == 'auto':
+            notifications += 'Your TZ is up:\n'
+            tz_db = DbManager(cache_loc='tz-subscriptions.json')
+            tz_sub_cache = tz_db.read_db()
+            for userid, user_data in tz_sub_cache.items():
+                if user_data['notify'] in ['both', 'mention']:
+                    if tz in user_data['events']:
+                        notifications += f'<@{int(userid)}> '
+                elif user_data['notify'] == 'email':
+                    pass
+        reply = f':skull_crossbones::skull_crossbones::skull_crossbones::skull_crossbones::skull_crossbones::skull_crossbones::skull_crossbones::skull_crossbones::skull_crossbones::\n' \
+                f'Current Terror Zone: {tz}\n' \
+                f'Next Terror Zone: {ntz}\n' \
+                f'Data courtesy of d2runewizard.com\n' \
+                f':skull_crossbones::skull_crossbones::skull_crossbones::skull_crossbones::skull_crossbones::skull_crossbones::skull_crossbones::skull_crossbones::skull_crossbones::\n'\
+                f'{notifications}'
         return reply
 
 
@@ -259,17 +358,26 @@ class Diablo2IOClient():
         :param hardcore: hardcore or softcore (1 for Hardcore, 2 for Softcore, blank for all)
         :return: current dclone status as json
         """
-        try:
+        db = DbManager(cache_loc='dclone.json')
+        db_read_cache = db.read_db()
+        query_api = False
+        if not db_read_cache:
+            query_api = True
+        elif datetime.utcnow() - datetime.fromisoformat(db_read_cache['ts'].replace("Z", "")) > timedelta(minutes=1):
+            query_api = True
+        else:
+            return_data = db_read_cache['data']
+        if query_api:
             url = 'https://diablo2.io/dclone_api.php'
             params = {'region': region, 'ladder': ladder, 'hc': hardcore}
             headers = {'User-Agent': f'dclone-discord/{__version__}'}
             response = get(url, params=params, headers=headers, timeout=10)
-
             response.raise_for_status()
-            return response.json()
-        except Exception as err:
-            print(f'[Diablo2IOClient.status] API Error: {err}')
-            return None
+            db_read_cache['data'] = response.json()
+            db_read_cache['ts'] = datetime.utcnow().isoformat() + "Z"
+            db.write_db(db_read_cache)
+            return_data = response.json()
+        return return_data
 
     def progress_message(self):
         """
@@ -296,36 +404,8 @@ class Diablo2IOClient():
 
             message += f' - {emoji} **{REGION[region]} {LADDER[ladder]} {HC[hardcore]}** is `{progress}/6` <t:{timestamped}:R>\n'
         message += '> Data courtesy of diablo2.io'
-
-        # get planned walks from d2runewizard.com API
-        # TODO: move to D2RuneWizardClient
-        if DCLONE_D2RW_TOKEN:
-            try:
-                response = get(
-                    f'https://d2runewizard.com/api/diablo-clone-progress/planned-walks?token={DCLONE_D2RW_TOKEN}',
-                    headers=headers,
-                    timeout=10)
-                response.raise_for_status()
-
-                # filter planned walks to configured mode and add relevant ones to the message
-                planned_walks = D2RuneWizardClient.filter_walks(response.json().get('walks'))
-                if len(planned_walks) > 0:
-                    message += '\n\nPlanned Walks:\n'
-                    for walk in planned_walks:
-                        region = walk.get('region')
-                        ladder = walk.get('ladder')
-                        hardcore = walk.get('hardcore')
-                        timestamp = int(walk.get('timestamp') / 1000)
-                        name = walk.get('displayName')
-                        emoji = D2RuneWizardClient.emoji(region=region, ladder=ladder, hardcore=hardcore)
-                        unconfirmed = ' **[UNCONFIRMED]**' if not walk.get('confirmed') else ''
-
-                        message += f' - {emoji} **{region} {LADDER_RW[ladder]} {HC_RW[hardcore]}** <t:{timestamp}:R> reported by `{name}`{unconfirmed}\n'
-                    message += '> Data courtesy of d2runewizard.com'
-            except Exception as err:
-                print(f'[ChatOp] D2RuneWizard API Error: {err}')
-
-        return message
+        final_message = D2RuneWizardClient.dclone_walks(message)
+        return final_message
 
     def should_update(self, mode):
         """
@@ -351,6 +431,153 @@ class Diablo2IOClient():
         return False
 
 
+class EventSubscriptionView(View):
+    def __init__(self, user_id: int, events: list[str]):
+        super().__init__(timeout=None)
+        self.user_id = user_id
+        self.events = events
+
+        # Split into pages of ≤25 options
+        self.pages = [events[i:i+25] for i in range(0, len(events), 25)]
+        self.page = 0
+        self.selected: list[str] = []
+        self._build_view()
+
+    def _build_view(self):
+        self.clear_items()
+
+        # Dropdown for the current page
+        opts = [
+            SelectOption(label=e, value=e, default=(e in self.selected))
+            for e in self.pages[self.page]
+        ]
+        select = Select(
+            placeholder=f"Page {self.page+1}/{len(self.pages)} → pick events",
+            min_values=0,
+            max_values=len(opts),
+            options=opts,
+            custom_id=f"event_sel_{self.page}"
+        )
+        select.callback = self.select_callback
+        self.add_item(select)
+
+        # Prev/Next if multiple pages
+        if len(self.pages) > 1:
+            prev = Button(label="⬅️ Prev", style=ButtonStyle.secondary, custom_id="prev_page")
+            nxt = Button(label="Next ➡️", style=ButtonStyle.secondary, custom_id="next_page")
+            prev.callback = self.prev_page
+            nxt.callback = self.next_page
+            self.add_item(prev)
+            self.add_item(nxt)
+
+        # Submit button
+        submit = Button(label="✅ Submit", style=ButtonStyle.success, custom_id="submit")
+        submit.callback = self.submit
+        self.add_item(submit)
+
+    async def select_callback(self, interaction: Interaction):
+        new_vals = interaction.data.get("values", [])
+        # Remove old selections from this page
+        for e in self.pages[self.page]:
+            if e in self.selected and e not in new_vals:
+                self.selected.remove(e)
+        # Add any newly selected
+        for e in new_vals:
+            if e not in self.selected:
+                self.selected.append(e)
+        await interaction.response.defer(ephemeral=True)
+
+    # Now only takes interaction
+    async def prev_page(self, interaction: Interaction):
+        self.page = (self.page - 1) % len(self.pages)
+        self._build_view()
+        await interaction.response.edit_message(view=self)
+
+    # Now only takes interaction
+    async def next_page(self, interaction: Interaction):
+        self.page = (self.page + 1) % len(self.pages)
+        self._build_view()
+        await interaction.response.edit_message(view=self)
+
+    # Now only takes interaction
+    async def submit(self, interaction: Interaction):
+        # Persist final selection
+        sub_db = DbManager('tz-subscriptions.json')
+        data = sub_db.read_db() or {}
+        entry = data.setdefault(str(self.user_id), {})
+        entry['events'] = self.selected
+        sub_db.write_db(data)
+
+        # Hand off to next step (notification-method view)
+        await interaction.response.send_message(
+            "Great! How would you like to be notified when those Terror Zones come up?",
+            view=NotificationMethodView(self.user_id),
+            ephemeral=True
+        )
+        self.stop()
+
+
+class NotificationMethodView(View):
+    def __init__(self, user_id: int):
+        super().__init__(timeout=None)
+        self.user_id = user_id
+
+    @button(label="📧 Email me", style=ButtonStyle.primary, custom_id="notify_email")
+    async def email_button(self, interaction: Interaction, button: Button):
+        await interaction.response.send_modal(EmailModal(self.user_id, mention=False))
+        self.stop()
+
+    @button(label="🔔 Mention me", style=ButtonStyle.secondary, custom_id="notify_mention")
+    async def mention_button(self, interaction: Interaction, button: Button):
+        sub_db = DbManager('tz-subscriptions.json')
+        data = sub_db.read_db() or {}
+        entry = data.setdefault(str(self.user_id), {})
+        entry['notify'] = 'mention'
+        entry['email'] = ''
+        sub_db.write_db(data)
+
+        await interaction.response.send_message(
+            "✅ You will be mentioned in the channel when your selected Terror Zones come up!",
+            ephemeral=True
+        )
+        self.stop()
+
+    @button(label="✉️🔔 Both", style=ButtonStyle.success, custom_id="notify_both")
+    async def both_button(self, interaction: Interaction, button: Button):
+        await interaction.response.send_modal(EmailModal(self.user_id, mention=True))
+        self.stop()
+
+
+class EmailModal(Modal, title="Enter your email address"):
+    email = TextInput(
+        label="Email Address",
+        placeholder="you@example.com",
+        required=True
+    )
+
+    def __init__(self, user_id: int, mention: bool):
+        super().__init__()
+        self.user_id = user_id
+        self.mention = mention
+
+    async def on_submit(self, interaction: Interaction):
+        address = self.email.value
+        sub_db = DbManager('tz-subscriptions.json')
+        data = sub_db.read_db() or {}
+        entry = data.setdefault(str(self.user_id), {})
+        entry['email'] = address
+        entry['notify'] = 'both' if self.mention else 'email'
+        sub_db.write_db(data)
+
+        await interaction.response.send_message(
+            f"✅ I'll email you at `{address}`" +
+            (" and mention you in-channel" if self.mention else "") +
+            " when your events occur.",
+            ephemeral=True
+        )
+        self.stop()
+
+
 class DiscordClient(discord.Client):
     """
     Connects to Discord and starts a background task that checks the diablo2.io dclone API every 60 seconds.
@@ -359,7 +586,13 @@ class DiscordClient(discord.Client):
     """
 
     def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+        supplied = kwargs.pop("intents", None)
+        if supplied is None:
+            intents = discord.Intents.default()
+        else:
+            intents = supplied
+        intents.message_content = True
+        super().__init__(*args, intents=intents, **kwargs)
 
         self.dclone = Diablo2IOClient()
         print(f'Tracking DClone for {REGION[DCLONE_REGION]}, {LADDER[DCLONE_LADDER]}, {HC[DCLONE_HC]}')
@@ -392,20 +625,59 @@ class DiscordClient(discord.Client):
             print(f'Background Task Error: {err}')
 
     async def on_message(self, message):
-        """
-        This is called any time the bot receives a message. It implements the dclone chatop.
-        """
-        channel = self.get_channel(message.channel.id)
-        if message.content.startswith('.dclone') or message.content.startswith('!dclone'):
+        # don’t respond to other bots (including yourself)
+        if message.author.bot:
+            return
+
+        channel = message.channel  # simpler than get_channel
+        content = message.content
+
+        if content.startswith('!dclonesub'):
+            sub_db = DbManager(cache_loc='dclone-subscriptions.json')
+            if not sub_db:
+                sub_db.write_db({})
+            db_data = sub_db.read_db()
+            db_data[message.author.name] = message.author.id
+            sub_db.write_db(db_data)
+            print(f"User {message.author.name} ({message.author.id}) subscribed")
+            await channel.send(f"✅ {message.author.mention}, you’re now subscribed.")
+        elif content.startswith('!dclone'):
             print(f'Responding to dclone chatop from {message.author}')
-            current_status = self.dclone.progress_message()
-            await channel.send(current_status)
-        elif message.content.startswith('!tz'):
+            await channel.send(self.dclone.progress_message())
+        elif content.startswith('!tzsub'):
+            view = EventSubscriptionView(user_id=message.author.id, events=EVENT_LIST)
+            await channel.send(
+                "Choose what Terror Zones you would like to be notified about:",
+                view=view
+            )
+        elif content.startswith('!tz'):
             print(f'Providing Terror Zone info to {message.author}')
-            await channel.send(D2RuneWizardClient.terror_zone())
-        elif message.content.startswith('!help'):
-            await channel.send(f'Commands are:\n!dclone | Displays the latest Dclone info including planned walks.\n'
-                               f'!tz | Displays the latest Terror Zone info.\n!help | ...Provides a clue -.0')
+            await channel.send(D2RuneWizardClient.terror_zone(mode='user'))
+
+        elif content.startswith('!roll'):
+            parts = content.split()
+            try:
+                top = int(parts[1]) if len(parts) > 1 else 6
+            except ValueError:
+                top = 6
+            roll = randint(1, top)
+            print(f'Providing random roll to {message.author}')
+            await channel.send(f'{message.author.mention} rolled: {roll}')
+        elif content.startswith('!myid'):
+            print(f"User: {message.author.name}, ID: {message.author.id}")
+            await channel.send(f"Your Discord ID is `{message.author.id}`")
+
+        elif content.startswith('!help'):
+            await channel.send(
+                '**Commands**\n'
+                '`!dclone` – show current DClone status\n'
+                '`!tz` – show Terror Zone info\n'
+                '`!roll [n]` – roll 1–n (default 6)\n'
+                '`!dclonesub` – subscribe to DClone pings\n'
+                '`!tzsub` – pick which random events you want\n'
+                '`!myid` – DM your Discord ID\n'
+                '`!help` – show this menu'
+            )
 
     @tasks.loop(seconds=60)
     async def check_dclone_status(self):
@@ -442,11 +714,17 @@ class DiscordClient(discord.Client):
                     f'{REGION[region]} {LADDER[ladder]} {HC[hardcore]} is now {progress}/6 (was {progress_was}/6) (reporter_id: {reporter_id})')
 
                 # post to discord
+                sub_db_ = DbManager('dclone-subscriptions.json').read_db()
+                if sub_db_:
+                    user_ids_to_ping = sub_db_.values()
+                else:
+                    user_ids_to_ping = []
+                mentions = ' '.join([f'<@{uid}>' for uid in user_ids_to_ping])
                 message = f'[{progress}/6] {emoji} **{REGION[region]} {LADDER[ladder]} {HC[hardcore]}** DClone progressed (reporter_id: {reporter_id})'
                 message += '\n> Data courtesy of diablo2.io'
 
                 channel = self.get_channel(DCLONE_DISCORD_CHANNEL_ID)
-                await channel.send(message)
+                await channel.send(f'{message}\n{mentions}')
 
                 # update current status
                 self.dclone.current_progress[(region, ladder, hardcore)] = progress
@@ -511,19 +789,21 @@ class DiscordClient(discord.Client):
                 print(f'[PlannedWalk] D2RuneWizard API Error: {err}')
             global dt_hour_last
             this_hour = datetime.now()
-            if dt_hour_last is None and last_update is None:
+            if last_update is None:
                 channel = self.get_channel(DCLONE_DISCORD_CHANNEL_ID)
                 dt_hour_last = datetime.now()
-                await channel.send(f'{D2RuneWizardClient.terror_zone()}')
+                await channel.send(f'{D2RuneWizardClient.terror_zone(mode="auto")}')
             elif dt_hour_last.hour == this_hour.hour:
                 if last_update.hour == this_hour.hour:
                     pass
                 else:
+                    await asyncio.sleep(160)
                     channel = self.get_channel(DCLONE_DISCORD_CHANNEL_ID)
                     dt_hour_last = datetime.hour
-                    await channel.send(f'{D2RuneWizardClient.terror_zone()}')
+                    await channel.send(f'{D2RuneWizardClient.terror_zone(mode="auto")}')
             elif dt_hour_last != this_hour:
-                msg_data = D2RuneWizardClient.terror_zone()
+                await asyncio.sleep(160)
+                msg_data = D2RuneWizardClient.terror_zone(mode='auto')
                 if last_update.hour == this_hour.hour:
                     channel = self.get_channel(DCLONE_DISCORD_CHANNEL_ID)
                     dt_hour_last = datetime.now()
