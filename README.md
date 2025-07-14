@@ -1,6 +1,6 @@
 # d2r-discord-bot
 
-![](https://img.shields.io/badge/version-0.1b-blue)
+![](https://img.shields.io/badge/version-0.2a-blue)
 
 A Discord bot for reporting [DClone Tracker](https://diablo2.io/dclonetracker.php) progress changes, upcoming [planned walks](https://d2runewizard.com/diablo-clone-tracker#planned-walks) and [Terror Zone](https://d2runewizard.com/api/terror-zone) info for Diablo 2: Resurrected. By default it will report any progress changes at or above level 2 for All Regions, Ladder and Non-Ladder, Softcore and planned walks an hour before they start. Also, every hour it will report on the latest Terror Zone.
 
