@@ -1,10 +1,13 @@
 import json
+import os
 from os import path
 
 
 class DbManager:
     def __init__(self, cache_loc='cache.json'):
-        self.cache_file = cache_loc
+        self.cache_file = f'db/{cache_loc}'
+        if not path.isdir('db'):
+            os.mkdir('db')
         if not path.isfile(cache_loc):
             open(cache_loc, 'w').close()
             self.write_db({})
