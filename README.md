@@ -6,6 +6,10 @@ A Discord bot for reporting [DClone Tracker](https://diablo2.io/dclonetracker.ph
 
 You can also get a list of avalable commands by typing !help in the chatt.
 
+Work in progress:
+
+You can now use !dclonesub and !tzsub to subscribe and get @mentions when a given TZ comes up or a Dclone walk is imminent. Working on an email system to be updated soon.
+
 ## Usage
 
 Requires Python 3.11+, tested on Ubuntu 24.04 and Windows 11.
