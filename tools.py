@@ -8,8 +8,8 @@ class DbManager:
         self.cache_file = f'db/{cache_loc}'
         if not path.isdir('db'):
             os.mkdir('db')
-        if not path.isfile(cache_loc):
-            open(cache_loc, 'w').close()
+        if not path.isfile(self.cache_file):
+            open(self.cache_file, 'w').close()
             self.write_db({})
 
     def read_db(self):

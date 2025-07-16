@@ -8,7 +8,7 @@ You can also get a list of avalable commands by typing !help in the chatt.
 
 ## Usage
 
-Requires Python 3.6+, tested on Ubuntu 20.04 and 22.04.
+Requires Python 3.11+, tested on Ubuntu 24.04 and Windows 11.
 
 ### Installation
 
@@ -27,7 +27,8 @@ Configuration is done via environment variables, or you can edit the variables n
  - `DCLONE_DISCORD_CHANNEL_ID`: The [channel id](https://support.discord.com/hc/en-us/articles/206346498-Where-can-I-find-my-User-Server-Message-ID-) to send messages to.
 
 **Optional**
- - `DCLONE_D2RW_TOKEN` (**Highly Recommended**): Token for querying d2runewizard.com, required if you want planned walk information as well as terror zone information. Request one [here](https://d2runewizard.com/integration).
+ - `DCLONE_D2EMU_TOKEN` (**Highly Recommended**): Token for querying d2emu.com, extreamly detailed terror zone info as well as higher accuracy than d2runwizard - will default to d2emu if a token and username is provided. Request token from the d2emu discord [here](https://discord.gg/yeFkxYdpru)
+ - `DCLONE_D2RW_TOKEN`  (**Highly Recommended**): Token for querying d2runewizard.com, required if you want planned walk information as well as terror zone information. Request one [here](https://d2runewizard.com/integration).
  - `DCLONE_REGION`: `1` for Americas, `2` for Europe, `3` for Asia, blank **(Default)** for All Regions.
  - `DCLONE_LADDER`: `1` for Ladder, `2` for Non-Ladder, blank **(Default)** for both.
  - `DCLONE_HC`: `1` for Harcore, `2` for Softcore **(Default)**, blank for both.
@@ -40,6 +41,6 @@ Start the bot with `python3 d2r-discord-bot.py`.
 
 ## Disclaimer
 
-Data courtesy of [diablo2.io](https://diablo2.io) and [d2runewizard.com](https://d2runewizard.com).
+Data courtesy of [diablo2.io](https://diablo2.io), [d2runewizard.com](https://d2runewizard.com) and [d2emu.com](d2emu.com).
 
 Base code courtesy of [Synse](https://github.com/Synse/dclone-discord).

@@ -41,6 +41,12 @@ DCLONE_DISCORD_CHANNEL_ID = int(environ.get('DCLONE_DISCORD_CHANNEL_ID'))
 # This token is necessary for planned walk notifications
 DCLONE_D2RW_TOKEN = environ.get('DCLONE_D2RW_TOKEN')
 
+# D2Emu token, required for Terror zoneinfo from D2Emu
+DCLONE_D2EMU_TOKEN = environ.get('DCLONE_D2EMU_TOKEN')
+DCLONE_D2EMU_USERNAME = environ.get('DCLONE_D2EMU_USERNAME')
+
+# Setup for TZ source
+TERROR_ZONE_SOURCE = 'emu'
 # DClone tracker API (Optional)
 # Defaults to All Regions, Ladder and Non-Ladder, Softcore
 DCLONE_REGION = environ.get('DCLONE_REGION', '')  # 1 for Americas, 2 for Europe, 3 for Asia, blank for all
@@ -55,42 +61,51 @@ DCLONE_REPORTS = int(
 
 # Terror zone list
 EVENT_LIST = [
-  "Blood Moor and Den of Evil",
-  "Cold Plains and The Cave",
-  "Burial Grounds, The Crypt, and the Mausoleum",
-  "Stony Field",
-  "Dark Wood / Underground Passage",
-  "Black Marsh / The Hole",
-  "The Forgotten Tower",
-  "Jail / Barracks",
-  "Cathedral and Catacombs",
-  "The Pit",
-  "Tristram",
-  "Moo Moo Farm",
-  "Sewers",
-  "Rocky Waste and Stony Tomb",
-  "Dry Hills and Halls of the Dead",
-  "Far Oasis",
-  "Lost City, Valley of Snakes, and Claw Viper Temple",
-  "Ancient Tunnels",
-  "Arcane Sanctuary",
-  "Tal Rasha's Tombs",
-  "Spider Forest and Spider Cavern",
-  "Great Marsh",
-  "Flayer Jungle and Flayer Dungeon",
-  "Kurast Bazaar, Ruined Temple, and Disused Fane",
-  "Travincal",
-  "Durance of Hate",
-  "Outer Steppes and Plains of Despair",
-  "River of Flame / City of the Damned",
-  "Chaos Sanctuary",
-  "Bloody Foothills / Frigid Highlands / Abbadon",
-  "Glacial Trail / Drifter Cavern",
-  "Crystalline Passage and Frozen River",
-  "Arreat Plateau / Pit of Acheron",
-  "Nihlathak's Temple, Halls of Anguish, Halls of Pain, and Halls of Vaught",
-  "Ancient's Way and Icy Cellar",
-  "Worldstone Keep, Throne of Destruction, and Worldstone Chamber"
+    "Ancient Tunnels",
+    "Ancient’s Way and Icy Cellar",
+    "Arcane Sanctuary",
+    "Arreat Plateau and Pit of Acheron",
+    "Black Marsh and The Hole",
+    "Blood Moor and Den of Evil",
+    "Bloody Foothills, Frigid Highlands, and Abaddon",
+    "Burial Grounds, The Crypt, and The Mausoleum",
+    "Cathedral and Catacombs",
+    "Chaos Sanctuary",
+    "Cold Plains and The Cave",
+    "Crystalline Passage and Frozen River",
+    "Dark Wood and Underground Passage",
+    "Dry Hills and Halls of the Dead",
+    "Durance of Hate",
+    "Flayer Jungle and Flayer Dungeon",
+    "Glacial Trail and Drifter Cavern",
+    "Great Marsh",
+    "Kurast Bazaar, Ruined Temple, and Disused Fane",
+    "Lost City, Valley of Snakes, and Claw Viper Temple",
+    "Lut Gholein Sewers",
+    "Nihlathak’s Temple, Halls of Anguish, Halls of Pain, and Halls of Vaught",
+    "Outer Steppes and Plains of Despair",
+    "River of Flame and City of the Damned",
+    "Rocky Waste and Stony Tomb",
+    "Spider Forest and Spider Cavern",
+    "Stony Field",
+    "Tal Rasha’s Tombs and Tal Rasha’s Chamber",
+    "The Forgotten Tower",
+    "Travincal",
+    "Tristram",
+    "Worldstone Keep, Throne of Destruction, and Worldstone Chamber",
+    "Dark Wood / Underground Passage",
+    "Black Marsh / The Hole",
+    "Jail / Barracks",
+    "The Pit",
+    "Moo Moo Farm",
+    "Sewers",
+    "Tal Rasha's Tombs",
+    "River of Flame / City of the Damned",
+    "Bloody Foothills / Frigid Highlands / Abbadon",
+    "Glacial Trail / Drifter Cavern",
+    "Arreat Plateau / Pit of Acheron",
+    "Nihlathak's Temple, Halls of Anguish, Halls of Pain, and Halls of Vaught",
+    "Ancient's Way and Icy Cellar",
 ]
 
 ########################
@@ -121,6 +136,79 @@ headers = {
     "D2R-Platform": "Discord",
     "D2R-Repo": "https://github.com/shallox/d2r-discord-bot"
 }
+
+
+def d2emu_request(mode):
+    emu_db = DbManager('emu_tz_cache.json')
+    tz_cache = emu_db.read_db()
+    if not tz_cache or tz_cache['next_terror_time_utc'] < time() or len(tz_cache['next']) == 0:
+        print('aaa')
+        data = get(
+            'https://d2emu.com/api/v1/tz',
+            headers={
+                'x-emu-username': DCLONE_D2EMU_USERNAME,
+                'x-emu-token': DCLONE_D2EMU_TOKEN
+            }
+        )
+        if data.status_code == 200:
+            data_ = data.json()
+            emu_db.write_db(data_)
+        else:
+            data_ = tz_cache
+    else:
+        data_ = tz_cache
+    zone_db = DbManager('zones.json').read_db()
+    immunities_filter = {"ph": 'Physical', "l": 'Lightning', "f": 'Fire', "p": 'Poison', 'c': 'Cold', 'm': 'Magic'}
+    raw_current_tz = ''.join(f'{zone_db[str(tz)]}, ' for tz in data_['current']).rsplit(', ', 1)[0]
+    sp_current_tz = raw_current_tz.split(', ')
+    if len(sp_current_tz) > 2:
+        fsplit = raw_current_tz.rsplit(', ', 1)
+        current_tz = f"{fsplit[0]}, and {fsplit[1]}"
+    else:
+        current_tz = raw_current_tz
+    raw_next_tz = ''.join(f'{zone_db[str(tz)]}, ' for tz in data_['next']).rsplit(', ', 1)[0]
+    sp_next_tz = raw_next_tz.split(', ')
+    if len(sp_next_tz) > 2:
+        nsplit = raw_next_tz.rsplit(', ', 1)
+        next_tz = f"{nsplit[0]}, and {nsplit[1]}"
+    else:
+        next_tz = raw_next_tz
+    raw_dataset = {
+        'current_tz': current_tz,
+        'current_superuniques': ''.join(f'{ub}, ' for ub in data_['current_superuniques']).rsplit(', ', 1)[0],
+        'current_num_boss_packs': f"{data_['current_num_boss_packs'][0]}-{data_['current_num_boss_packs'][1]}",
+        'current_immunities': ''.join(f'{immunities_filter[im]}, ' for im in data_['current_immunities']).rsplit(', ', 1)[0],
+        'next_tz': next_tz,
+        'next_superuniques': ''.join(f'{ub}, ' for ub in data_['next_superuniques']).rsplit(', ', 1)[0],
+        'next_num_boss_packs': f"{data_['current_num_boss_packs'][0]}-{data_['current_num_boss_packs'][1]}",
+        'next_immunities': ''.join(f'{immunities_filter[im]}, ' for im in data_['current_immunities']).rsplit(', ', 1)[0],
+    }
+    tz = raw_dataset['current_tz']
+    ntz = raw_dataset['next_tz']
+    notifications = ''
+    if mode == 'auto':
+        notifications += 'Your TZ is up:\n'
+        tz_db = DbManager(cache_loc='tz-subscriptions.json')
+        tz_sub_cache = tz_db.read_db()
+        for userid, user_data in tz_sub_cache.items():
+            if user_data['notify'] in ['both', 'mention']:
+                if tz.split(' ', 1)[0] in [stz.split(' ', 1)[0] for stz in user_data['events']]:
+                    notifications += f'<@{int(userid)}> '
+            elif user_data['notify'] == 'email':
+                pass
+    reply = f':skull_crossbones::skull_crossbones::skull_crossbones::skull_crossbones::skull_crossbones::skull_crossbones::skull_crossbones::skull_crossbones::skull_crossbones::\n' \
+            f'Current Terror Zone: {tz}\n' \
+            f'Super Uniques in TZ: {raw_dataset["current_superuniques"]}\n' \
+            f'Boss packs in TZ: {raw_dataset["current_num_boss_packs"]}' \
+            f'Immunities in TZ: {raw_dataset["current_immunities"]}' \
+            f'Next Terror Zone: {ntz}\n' \
+            f'Super Uniques in next TZ: {raw_dataset["next_superuniques"]}\n' \
+            f'Boss packs in next TZ: {raw_dataset["next_num_boss_packs"]}' \
+            f'Immunities in next TZ: {raw_dataset["next_immunities"]}' \
+            f'Data courtesy of d2emu.com\n' \
+            f':skull_crossbones::skull_crossbones::skull_crossbones::skull_crossbones::skull_crossbones::skull_crossbones::skull_crossbones::skull_crossbones::skull_crossbones::\n' \
+            f'{notifications}'
+    return reply
 
 
 class D2RuneWizardClient():
@@ -261,7 +349,7 @@ class D2RuneWizardClient():
             tz_sub_cache = tz_db.read_db()
             for userid, user_data in tz_sub_cache.items():
                 if user_data['notify'] in ['both', 'mention']:
-                    if tz in user_data['events']:
+                    if tz.split(' ', 1)[0] in [stz.split(' ', 1)[0] for stz in user_data['events']]:
                         notifications += f'<@{int(userid)}> '
                 elif user_data['notify'] == 'email':
                     pass
@@ -651,8 +739,12 @@ class DiscordClient(discord.Client):
                 view=view
             )
         elif content.startswith('!tz'):
-            print(f'Providing Terror Zone info to {message.author}')
-            await channel.send(D2RuneWizardClient.terror_zone(mode='user'))
+            if DCLONE_D2EMU_TOKEN:
+                print(f'Providing Terror Zone info to {message.author}')
+                await channel.send(d2emu_request(mode='user'))
+            elif DCLONE_D2RW_TOKEN:
+                print(f'Providing Terror Zone info to {message.author}')
+                await channel.send(D2RuneWizardClient.terror_zone(mode='user'))
 
         elif content.startswith('!roll'):
             parts = content.split()
@@ -753,6 +845,7 @@ class DiscordClient(discord.Client):
 
         # check for upcoming walks using the D2RuneWizard API
         if DCLONE_D2RW_TOKEN:
+            channel = self.get_channel(DCLONE_DISCORD_CHANNEL_ID)
             try:
                 response = get(
                     f'https://d2runewizard.com/api/diablo-clone-progress/planned-walks?token={DCLONE_D2RW_TOKEN}',
@@ -790,22 +883,28 @@ class DiscordClient(discord.Client):
             global dt_hour_last
             this_hour = datetime.now()
             if last_update is None:
-                channel = self.get_channel(DCLONE_DISCORD_CHANNEL_ID)
                 dt_hour_last = datetime.now()
-                await channel.send(f'{D2RuneWizardClient.terror_zone(mode="auto")}')
+                if DCLONE_D2EMU_TOKEN:
+                    await channel.send(f'{d2emu_request(mode="auto")}')
+                elif DCLONE_D2RW_TOKEN:
+                    await channel.send(f'{D2RuneWizardClient.terror_zone(mode="auto")}')
             elif dt_hour_last.hour == this_hour.hour:
                 if last_update.hour == this_hour.hour:
                     pass
                 else:
                     await asyncio.sleep(160)
-                    channel = self.get_channel(DCLONE_DISCORD_CHANNEL_ID)
                     dt_hour_last = datetime.hour
-                    await channel.send(f'{D2RuneWizardClient.terror_zone(mode="auto")}')
+                    if DCLONE_D2EMU_TOKEN:
+                        await channel.send(f'{d2emu_request(mode="auto")}')
+                    elif DCLONE_D2RW_TOKEN:
+                        await channel.send(f'{D2RuneWizardClient.terror_zone(mode="auto")}')
             elif dt_hour_last != this_hour:
                 await asyncio.sleep(160)
-                msg_data = D2RuneWizardClient.terror_zone(mode='auto')
+                if DCLONE_D2EMU_TOKEN:
+                    msg_data = channel.send(f'{d2emu_request(mode="auto")}')
+                elif DCLONE_D2RW_TOKEN:
+                    msg_data = channel.send(f'{D2RuneWizardClient.terror_zone(mode="auto")}')
                 if last_update.hour == this_hour.hour:
-                    channel = self.get_channel(DCLONE_DISCORD_CHANNEL_ID)
                     dt_hour_last = datetime.now()
                     await channel.send(f'{msg_data}')
                 else:
