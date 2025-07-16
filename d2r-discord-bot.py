@@ -43,10 +43,9 @@ DCLONE_D2RW_TOKEN = environ.get('DCLONE_D2RW_TOKEN')
 
 # D2Emu token, required for Terror zoneinfo from D2Emu
 DCLONE_D2EMU_TOKEN = environ.get('DCLONE_D2EMU_TOKEN')
+print([a for a in environ.keys() if 'DCLONE' in a])
 DCLONE_D2EMU_USERNAME = environ.get('DCLONE_D2EMU_USERNAME')
 
-# Setup for TZ source
-TERROR_ZONE_SOURCE = 'emu'
 # DClone tracker API (Optional)
 # Defaults to All Regions, Ladder and Non-Ladder, Softcore
 DCLONE_REGION = environ.get('DCLONE_REGION', '')  # 1 for Americas, 2 for Europe, 3 for Asia, blank for all
@@ -142,7 +141,6 @@ def d2emu_request(mode):
     emu_db = DbManager('emu_tz_cache.json')
     tz_cache = emu_db.read_db()
     if not tz_cache or tz_cache['next_terror_time_utc'] < time() or len(tz_cache['next']) == 0:
-        print('aaa')
         data = get(
             'https://d2emu.com/api/v1/tz',
             headers={
@@ -199,12 +197,12 @@ def d2emu_request(mode):
     reply = f':skull_crossbones::skull_crossbones::skull_crossbones::skull_crossbones::skull_crossbones::skull_crossbones::skull_crossbones::skull_crossbones::skull_crossbones::\n' \
             f'Current Terror Zone: {tz}\n' \
             f'Super Uniques in TZ: {raw_dataset["current_superuniques"]}\n' \
-            f'Boss packs in TZ: {raw_dataset["current_num_boss_packs"]}' \
-            f'Immunities in TZ: {raw_dataset["current_immunities"]}' \
+            f'Boss packs in TZ: {raw_dataset["current_num_boss_packs"]}\n' \
+            f'Immunities in TZ: {raw_dataset["current_immunities"]}\n' \
             f'Next Terror Zone: {ntz}\n' \
             f'Super Uniques in next TZ: {raw_dataset["next_superuniques"]}\n' \
-            f'Boss packs in next TZ: {raw_dataset["next_num_boss_packs"]}' \
-            f'Immunities in next TZ: {raw_dataset["next_immunities"]}' \
+            f'Boss packs in next TZ: {raw_dataset["next_num_boss_packs"]}\n' \
+            f'Immunities in next TZ: {raw_dataset["next_immunities"]}\n' \
             f'Data courtesy of d2emu.com\n' \
             f':skull_crossbones::skull_crossbones::skull_crossbones::skull_crossbones::skull_crossbones::skull_crossbones::skull_crossbones::skull_crossbones::skull_crossbones::\n' \
             f'{notifications}'
@@ -739,6 +737,7 @@ class DiscordClient(discord.Client):
                 view=view
             )
         elif content.startswith('!tz'):
+            print(DCLONE_D2EMU_TOKEN)
             if DCLONE_D2EMU_TOKEN:
                 print(f'Providing Terror Zone info to {message.author}')
                 await channel.send(d2emu_request(mode='user'))
