@@ -181,6 +181,8 @@ def d2emu_request(mode):
         'next_num_boss_packs': f"{data_['current_num_boss_packs'][0]}-{data_['current_num_boss_packs'][1]}",
         'next_immunities': ''.join(f'{immunities_filter[im]}, ' for im in data_['current_immunities']).rsplit(', ', 1)[0],
     }
+    global last_update
+    last_update = datetime.now()
     tz = raw_dataset['current_tz']
     ntz = raw_dataset['next_tz']
     notifications = ''
