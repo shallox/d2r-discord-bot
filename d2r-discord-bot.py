@@ -171,17 +171,15 @@ def d2emu_request(mode):
         next_tz = f"{nsplit[0]}, and {nsplit[1]}"
     else:
         next_tz = raw_next_tz
-    print(data_['current_immunities'])
-    print(immunities_filter)
     raw_dataset = {
         'current_tz': current_tz,
         'current_superuniques': ''.join(f'{ub}, ' for ub in data_['current_superuniques']).rsplit(', ', 1)[0],
         'current_num_boss_packs': f"{data_['current_num_boss_packs'][0]}-{data_['current_num_boss_packs'][1]}",
-        'current_immunities': ''.join(f'{immunities_filter[im]}, ' for im in data_['current_immunities']).rsplit(', ', 1)[0],
+        'current_immunities': ''.join(f'{immunities_filter[im]}, ' for im in data_['current_immunities'] if im in immunities_filter.keys()).rsplit(', ', 1)[0],
         'next_tz': next_tz,
         'next_superuniques': ''.join(f'{ub}, ' for ub in data_['next_superuniques']).rsplit(', ', 1)[0],
         'next_num_boss_packs': f"{data_['current_num_boss_packs'][0]}-{data_['current_num_boss_packs'][1]}",
-        'next_immunities': ''.join(f'{immunities_filter[im]}, ' for im in data_['current_immunities']).rsplit(', ', 1)[0],
+        'next_immunities': ''.join(f'{immunities_filter[im]}, ' for im in data_['current_immunities'] if im in immunities_filter.keys()).rsplit(', ', 1)[0],
     }
     global last_update
     last_update = datetime.now()
