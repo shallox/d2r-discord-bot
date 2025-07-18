@@ -171,6 +171,8 @@ def d2emu_request(mode):
         next_tz = f"{nsplit[0]}, and {nsplit[1]}"
     else:
         next_tz = raw_next_tz
+    print(data_['current_immunities'])
+    print(immunities_filter)
     raw_dataset = {
         'current_tz': current_tz,
         'current_superuniques': ''.join(f'{ub}, ' for ub in data_['current_superuniques']).rsplit(', ', 1)[0],
@@ -902,9 +904,11 @@ class DiscordClient(discord.Client):
             elif dt_hour_last != this_hour:
                 await asyncio.sleep(160)
                 if DCLONE_D2EMU_TOKEN:
-                    msg_data = channel.send(f'{d2emu_request(mode="auto")}')
-                elif DCLONE_D2RW_TOKEN:
-                    msg_data = channel.send(f'{D2RuneWizardClient.terror_zone(mode="auto")}')
+                    msg_data = d2emu_request(mode="auto")
+                    await channel.send(f'{msg_data}')
+                else:
+                    msg_data = D2RuneWizardClient.terror_zone(mode="auto")
+                    await channel.send(f'{msg_data}')
                 if last_update.hour == this_hour.hour:
                     dt_hour_last = datetime.now()
                     await channel.send(f'{msg_data}')
