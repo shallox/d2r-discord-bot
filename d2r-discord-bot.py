@@ -40,6 +40,7 @@ DCLONE_DISCORD_CHANNEL_ID = int(environ.get('DCLONE_DISCORD_CHANNEL_ID'))
 # D2RuneWizard API (Optional but recommended)
 # This token is necessary for planned walk notifications
 DCLONE_D2RW_TOKEN = environ.get('DCLONE_D2RW_TOKEN')
+DCLONE_D2RW_EMAIL = environ.get('DCLONE_D2RW_EMAIL')
 
 # D2Emu token, required for Terror zoneinfo from D2Emu
 DCLONE_D2EMU_TOKEN = environ.get('DCLONE_D2EMU_TOKEN')
@@ -123,12 +124,10 @@ if not DCLONE_DISCORD_TOKEN or DCLONE_DISCORD_CHANNEL_ID == 0:
     print('Please set DCLONE_DISCORD_TOKEN and DCLONE_DISCORD_CHANNEL_ID in your environment.')
     exit(1)
 
-if path.isfile('email.txt'):
-    efr = open('email.txt', 'r').read()
+if DCLONE_D2RW_EMAIL:
+    efr = DCLONE_D2RW_EMAIL
 else:
-    with open('email.txt', 'w') as efr_w:
-        efr = input('https://d2runewizard.com needs an email in order to authenticate to its api, please enter one:')
-        efr_w.write(efr)
+    print('Please set DCLONE_D2RW_EMAIL in your environment')
 headers = {
     "D2R-Contact": efr.replace('\n', ''),
     "D2R-Platform": "Discord",
@@ -882,7 +881,7 @@ class DiscordClient(discord.Client):
                 pass
             else:
                 if DCLONE_D2EMU_TOKEN:
-                    await asyncio.sleep(10)
+                    await asyncio.sleep(160)
                     await channel.send(f'{d2emu_request(mode="auto")}')
                 elif DCLONE_D2RW_TOKEN:
                     await asyncio.sleep(160)
