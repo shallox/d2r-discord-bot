@@ -43,7 +43,6 @@ DCLONE_D2RW_TOKEN = environ.get('DCLONE_D2RW_TOKEN')
 
 # D2Emu token, required for Terror zoneinfo from D2Emu
 DCLONE_D2EMU_TOKEN = environ.get('DCLONE_D2EMU_TOKEN')
-print([a for a in environ.keys() if 'DCLONE' in a])
 DCLONE_D2EMU_USERNAME = environ.get('DCLONE_D2EMU_USERNAME')
 
 # DClone tracker API (Optional)
@@ -110,7 +109,7 @@ EVENT_LIST = [
 ########################
 # End of configuration #
 ########################
-__version__ = '0.2a'
+__version__ = '1.0.0'
 REGION = {'1': 'Americas', '2': 'Europe', '3': 'Asia', '': 'All Regions'}
 LADDER = {'1': 'Ladder', '2': 'Non-Ladder', '': 'Ladder and Non-Ladder'}
 LADDER_RW = {True: 'Ladder', False: 'Non-Ladder'}
@@ -181,8 +180,6 @@ def d2emu_request(mode):
         'next_num_boss_packs': f"{data_['current_num_boss_packs'][0]}-{data_['current_num_boss_packs'][1]}",
         'next_immunities': ''.join(f'{immunities_filter[im]}, ' for im in data_['current_immunities'] if im in immunities_filter.keys()).rsplit(', ', 1)[0],
     }
-    global last_update
-    last_update = datetime.now()
     tz = raw_dataset['current_tz']
     ntz = raw_dataset['next_tz']
     notifications = ''
@@ -340,8 +337,6 @@ class D2RuneWizardClient():
                 md5(f'{datetime.utcnow().replace(minute=0, second=0, microsecond=0).isoformat()}-{tz}'.encode()).hexdigest(),
                 {'zone': tz, 'ts': datetime.utcnow().replace(minute=0, second=0, microsecond=0).isoformat() + "Z"})
         ntz = next_terror_info['zone']
-        global last_update
-        last_update = datetime.now()
         notifications = ''
         if mode == 'auto':
             notifications += 'Your TZ is up:\n'
@@ -845,7 +840,7 @@ class DiscordClient(discord.Client):
                       f'(currently {progress_was}/6) (reporter_id: {reporter_id}) at {report_timestamp}')
 
         # check for upcoming walks using the D2RuneWizard API
-        if DCLONE_D2RW_TOKEN:
+        if DCLONE_D2RW_TOKEN or DCLONE_D2EMU_TOKEN:
             channel = self.get_channel(DCLONE_DISCORD_CHANNEL_ID)
             try:
                 response = get(
@@ -881,37 +876,18 @@ class DiscordClient(discord.Client):
                         self.dclone.alerted_walks.append(walk_id)
             except Exception as err:
                 print(f'[PlannedWalk] D2RuneWizard API Error: {err}')
-            global dt_hour_last
+            global last_update
             this_hour = datetime.now()
-            if last_update is None:
-                dt_hour_last = datetime.now()
+            if last_update and last_update.hour == this_hour.hour and last_update.date() == this_hour.date():
+                pass
+            else:
                 if DCLONE_D2EMU_TOKEN:
+                    await asyncio.sleep(10)
                     await channel.send(f'{d2emu_request(mode="auto")}')
                 elif DCLONE_D2RW_TOKEN:
-                    await channel.send(f'{D2RuneWizardClient.terror_zone(mode="auto")}')
-            elif dt_hour_last.hour == this_hour.hour:
-                if last_update.hour == this_hour.hour:
-                    pass
-                else:
                     await asyncio.sleep(160)
-                    dt_hour_last = datetime.hour
-                    if DCLONE_D2EMU_TOKEN:
-                        await channel.send(f'{d2emu_request(mode="auto")}')
-                    elif DCLONE_D2RW_TOKEN:
-                        await channel.send(f'{D2RuneWizardClient.terror_zone(mode="auto")}')
-            elif dt_hour_last != this_hour:
-                await asyncio.sleep(160)
-                if DCLONE_D2EMU_TOKEN:
-                    msg_data = d2emu_request(mode="auto")
-                    await channel.send(f'{msg_data}')
-                else:
-                    msg_data = D2RuneWizardClient.terror_zone(mode="auto")
-                    await channel.send(f'{msg_data}')
-                if last_update.hour == this_hour.hour:
-                    dt_hour_last = datetime.now()
-                    await channel.send(f'{msg_data}')
-                else:
-                    pass
+                    await channel.send(f'{D2RuneWizardClient.terror_zone(mode="auto")}')
+                last_update = datetime.now()
 
     @check_dclone_status.before_loop
     async def before_check_dclone_status(self):
