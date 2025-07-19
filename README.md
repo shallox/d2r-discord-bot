@@ -1,12 +1,10 @@
 # d2r-discord-bot
 
-![](https://img.shields.io/badge/version-0.2a-blue)
+![](https://img.shields.io/badge/version-1.0.0-blue)
 
-A Discord bot for reporting [DClone Tracker](https://diablo2.io/dclonetracker.php) progress changes, upcoming [planned walks](https://d2runewizard.com/diablo-clone-tracker#planned-walks) and [Terror Zone](https://d2runewizard.com/api/terror-zone) info for Diablo 2: Resurrected. By default it will report any progress changes at or above level 2 for All Regions, Ladder and Non-Ladder, Softcore and planned walks an hour before they start. Also, every hour it will report on the latest Terror Zone.
+A Discord bot for reporting [DClone Tracker](https://diablo2.io/dclonetracker.php) progress changes, upcoming [planned walks](https://d2runewizard.com/diablo-clone-tracker#planned-walks) and [Terror Zone](https://d2runewizard.com/api/terror-zone) info for Diablo 2: Resurrected. By default, it will report any progress changes at or above level 2 for All Regions, Ladder and Non-Ladder, Softcore and planned walks an hour before they start. Also, every hour it will report on the latest Terror Zone.
 
-You can also get a list of avalable commands by typing !help in the chatt.
-
-Work in progress:
+You can also get a list of available commands by typing !help in the chat.
 
 You can now use !dclonesub and !tzsub to subscribe and get @mentions when a given TZ comes up or a Dclone walk is imminent. Working on an email system to be updated soon.
 
