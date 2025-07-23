@@ -118,6 +118,7 @@ HC = {'1': 'Hardcore', '2': 'Softcore', '': 'Hardcore and Softcore'}
 HC_RW = {True: 'Hardcore', False: 'Softcore'}
 dt_hour_last = None
 last_update = None
+emu_five = False
 
 # DCLONE_DISCORD_TOKEN and DCLONE_DISCORD_CHANNEL_ID are required
 if not DCLONE_DISCORD_TOKEN or DCLONE_DISCORD_CHANNEL_ID == 0:
@@ -204,7 +205,13 @@ def d2emu_request(mode):
             f'Data courtesy of d2emu.com\n' \
             f':skull_crossbones::skull_crossbones::skull_crossbones::skull_crossbones::skull_crossbones::skull_crossbones::skull_crossbones::skull_crossbones::skull_crossbones::\n' \
             f'{notifications}'
-    return reply
+    part_reply = {
+        'current':
+            f':skull_crossbones::skull_crossbones::skull_crossbones::skull_crossbones::skull_crossbones::skull_crossbones::skull_crossbones::skull_crossbones::skull_crossbones::\nCurrent Terror Zone: {tz}\nSuper Uniques in TZ: {raw_dataset["current_superuniques"]}\nBoss packs in TZ: {raw_dataset["current_num_boss_packs"]}\nImmunities in TZ: {raw_dataset["current_immunities"]}\nData courtesy of d2emu.com\n{notifications}\n:skull_crossbones::skull_crossbones::skull_crossbones::skull_crossbones::skull_crossbones::skull_crossbones::skull_crossbones::skull_crossbones::skull_crossbones::',
+        'next':
+            f':skull_crossbones::skull_crossbones::skull_crossbones::skull_crossbones::skull_crossbones::skull_crossbones::skull_crossbones::skull_crossbones::skull_crossbones::\nNext Terror Zone: {ntz}\nSuper Uniques in next TZ: {raw_dataset["next_superuniques"]}\nBoss packs in next TZ: {raw_dataset["next_num_boss_packs"]}\nImmunities in next TZ: {raw_dataset["next_immunities"]}\n:skull_crossbones::skull_crossbones::skull_crossbones::skull_crossbones::skull_crossbones::skull_crossbones::skull_crossbones::skull_crossbones::skull_crossbones::'
+            }
+    return {'tz_full': reply, 'tz_part': part_reply}
 
 
 class D2RuneWizardClient():
@@ -736,7 +743,7 @@ class DiscordClient(discord.Client):
             print(DCLONE_D2EMU_TOKEN)
             if DCLONE_D2EMU_TOKEN:
                 print(f'Providing Terror Zone info to {message.author}')
-                await channel.send(d2emu_request(mode='user'))
+                await channel.send(d2emu_request(mode='user')['tz_full'])
             elif DCLONE_D2RW_TOKEN:
                 print(f'Providing Terror Zone info to {message.author}')
                 await channel.send(D2RuneWizardClient.terror_zone(mode='user'))
@@ -876,13 +883,18 @@ class DiscordClient(discord.Client):
             except Exception as err:
                 print(f'[PlannedWalk] D2RuneWizard API Error: {err}')
             global last_update
+            global emu_five
             this_hour = datetime.now()
             if last_update and last_update.hour == this_hour.hour and last_update.date() == this_hour.date():
+                if this_hour.minute >= 10 and emu_five and DCLONE_D2EMU_TOKEN:
+                    await channel.send(f'{d2emu_request(mode="auto")["tz_part"]["next"]}')
+                    emu_five = False
                 pass
             else:
                 if DCLONE_D2EMU_TOKEN:
-                    await asyncio.sleep(160)
-                    await channel.send(f'{d2emu_request(mode="auto")}')
+                    await asyncio.sleep(5)
+                    await channel.send(f'{d2emu_request(mode="auto")["tz_part"]["current"]}')
+                    emu_five = True
                 elif DCLONE_D2RW_TOKEN:
                     await asyncio.sleep(160)
                     await channel.send(f'{D2RuneWizardClient.terror_zone(mode="auto")}')
