@@ -36,7 +36,7 @@ from hashlib import md5
 # Discord (Required)
 DCLONE_DISCORD_TOKEN = environ.get('DCLONE_DISCORD_TOKEN')
 DCLONE_DISCORD_CHANNEL_ID = int(environ.get('DCLONE_DISCORD_CHANNEL_ID'))
-TERRORZONE_CHANNEL_ID = int(environ.get('TERRORZONE_CHANNEL_ID'))
+TERRORZONE_CHANNEL_ID = int(environ.get('TERRORZONE_CHANNEL_ID', ''))
 
 # D2RuneWizard API (Optional but recommended)
 # This token is necessary for planned walk notifications
