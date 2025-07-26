@@ -31,6 +31,7 @@ Configuration is done via environment variables, or you can edit the variables n
 **Optional**
  - `DCLONE_D2EMU_TOKEN` (**Highly Recommended**): Token for querying d2emu.com, extreamly detailed terror zone info as well as higher accuracy than d2runwizard - will default to d2emu if a token and username is provided. Request token from the d2emu discord [here](https://discord.gg/yeFkxYdpru)
  - `DCLONE_D2RW_TOKEN`  (**Highly Recommended**): Token for querying d2runewizard.com, required if you want planned walk information as well as terror zone information. Request one [here](https://d2runewizard.com/integration).
+ - `TERRORZONE_CHANNEL_ID` Set a channel ID for Terror Zone updates, can be left blank and the Dclone channel will be used instead.
  - `DCLONE_REGION`: `1` for Americas, `2` for Europe, `3` for Asia, blank **(Default)** for All Regions.
  - `DCLONE_LADDER`: `1` for Ladder, `2` for Non-Ladder, blank **(Default)** for both.
  - `DCLONE_HC`: `1` for Harcore, `2` for Softcore **(Default)**, blank for both.

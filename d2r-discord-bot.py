@@ -36,6 +36,7 @@ from hashlib import md5
 # Discord (Required)
 DCLONE_DISCORD_TOKEN = environ.get('DCLONE_DISCORD_TOKEN')
 DCLONE_DISCORD_CHANNEL_ID = int(environ.get('DCLONE_DISCORD_CHANNEL_ID'))
+TERRORZONE_CHANNEL_ID = int(environ.get('TERRORZONE_CHANNEL_ID'))
 
 # D2RuneWizard API (Optional but recommended)
 # This token is necessary for planned walk notifications
@@ -174,11 +175,13 @@ def d2emu_request(mode):
         'current_tz': current_tz,
         'current_superuniques': ''.join(f'{ub}, ' for ub in data_['current_superuniques']).rsplit(', ', 1)[0],
         'current_num_boss_packs': f"{data_['current_num_boss_packs'][0]}-{data_['current_num_boss_packs'][1]}",
-        'current_immunities': ''.join(f'{immunities_filter[im]}, ' for im in data_['current_immunities'] if im in immunities_filter.keys()).rsplit(', ', 1)[0],
+        'current_immunities': ''.join(f'{immunities_filter[im]}, ' for im in data_['current_immunities'] if
+                                      im in immunities_filter.keys()).rsplit(', ', 1)[0],
         'next_tz': next_tz,
         'next_superuniques': ''.join(f'{ub}, ' for ub in data_['next_superuniques']).rsplit(', ', 1)[0],
         'next_num_boss_packs': f"{data_['current_num_boss_packs'][0]}-{data_['current_num_boss_packs'][1]}",
-        'next_immunities': ''.join(f'{immunities_filter[im]}, ' for im in data_['current_immunities'] if im in immunities_filter.keys()).rsplit(', ', 1)[0],
+        'next_immunities': ''.join(f'{immunities_filter[im]}, ' for im in data_['current_immunities'] if
+                                   im in immunities_filter.keys()).rsplit(', ', 1)[0],
     }
     tz = raw_dataset['current_tz']
     ntz = raw_dataset['next_tz']
@@ -210,7 +213,7 @@ def d2emu_request(mode):
             f':skull_crossbones::skull_crossbones::skull_crossbones::skull_crossbones::skull_crossbones::skull_crossbones::skull_crossbones::skull_crossbones::skull_crossbones::\nCurrent Terror Zone: {tz}\nSuper Uniques in TZ: {raw_dataset["current_superuniques"]}\nBoss packs in TZ: {raw_dataset["current_num_boss_packs"]}\nImmunities in TZ: {raw_dataset["current_immunities"]}\nData courtesy of d2emu.com\n{notifications}\n:skull_crossbones::skull_crossbones::skull_crossbones::skull_crossbones::skull_crossbones::skull_crossbones::skull_crossbones::skull_crossbones::skull_crossbones::',
         'next':
             f':skull_crossbones::skull_crossbones::skull_crossbones::skull_crossbones::skull_crossbones::skull_crossbones::skull_crossbones::skull_crossbones::skull_crossbones::\nNext Terror Zone: {ntz}\nSuper Uniques in next TZ: {raw_dataset["next_superuniques"]}\nBoss packs in next TZ: {raw_dataset["next_num_boss_packs"]}\nImmunities in next TZ: {raw_dataset["next_immunities"]}\n:skull_crossbones::skull_crossbones::skull_crossbones::skull_crossbones::skull_crossbones::skull_crossbones::skull_crossbones::skull_crossbones::skull_crossbones::'
-            }
+    }
     return {'tz_full': reply, 'tz_part': part_reply}
 
 
@@ -358,7 +361,7 @@ class D2RuneWizardClient():
                 f'Current Terror Zone: {tz}\n' \
                 f'Next Terror Zone: {ntz}\n' \
                 f'Data courtesy of d2runewizard.com\n' \
-                f':skull_crossbones::skull_crossbones::skull_crossbones::skull_crossbones::skull_crossbones::skull_crossbones::skull_crossbones::skull_crossbones::skull_crossbones::\n'\
+                f':skull_crossbones::skull_crossbones::skull_crossbones::skull_crossbones::skull_crossbones::skull_crossbones::skull_crossbones::skull_crossbones::skull_crossbones::\n' \
                 f'{notifications}'
         return reply
 
@@ -527,7 +530,7 @@ class EventSubscriptionView(View):
         self.events = events
 
         # Split into pages of ≤25 options
-        self.pages = [events[i:i+25] for i in range(0, len(events), 25)]
+        self.pages = [events[i:i + 25] for i in range(0, len(events), 25)]
         self.page = 0
         self.selected: list[str] = []
         self._build_view()
@@ -541,7 +544,7 @@ class EventSubscriptionView(View):
             for e in self.pages[self.page]
         ]
         select = Select(
-            placeholder=f"Page {self.page+1}/{len(self.pages)} → pick events",
+            placeholder=f"Page {self.page + 1}/{len(self.pages)} → pick events",
             min_values=0,
             max_values=len(opts),
             options=opts,
@@ -685,7 +688,10 @@ class DiscordClient(discord.Client):
 
         self.dclone = Diablo2IOClient()
         print(f'Tracking DClone for {REGION[DCLONE_REGION]}, {LADDER[DCLONE_LADDER]}, {HC[DCLONE_HC]}')
-
+        self.channel = None
+        self.tz_channel = None
+        self.dc_chan = None
+        self.tz_chan = None
         # DCLONE_D2RW_TOKEN is required for planned walk notifications
         if not DCLONE_D2RW_TOKEN:
             print('WARNING: DCLONE_D2RW_TOKEN is not set, you will not receive planned walk notifications.')
@@ -694,18 +700,22 @@ class DiscordClient(discord.Client):
         """
         Runs when the bot is connected to Discord and ready to receive messages. This starts our background task.
         """
+        self.channel = self.get_channel(DCLONE_DISCORD_CHANNEL_ID)
+        self.tz_channel = self.get_channel(TERRORZONE_CHANNEL_ID)
+        self.dc_chan = self.get_channel(DCLONE_DISCORD_CHANNEL_ID)
+        self.tz_chan = self.get_channel(TERRORZONE_CHANNEL_ID)
+        if not self.channel:
+            print('ERROR: Unable to access channel, please check DCLONE_DISCORD_CHANNEL_ID')
+        if not self.tz_channel:
+            self.tz_channel = self.get_channel(DCLONE_DISCORD_CHANNEL_ID)
         # pylint: disable=no-member
         print(f'Bot logged into Discord as "{self.user}"')
         servers = sorted([g.name for g in self.guilds])
         print(f'Connected to {len(servers)} servers: {", ".join(servers)}')
 
         # channel details
-        channel = self.get_channel(DCLONE_DISCORD_CHANNEL_ID)
-        if not channel:
-            print('ERROR: Unable to access channel, please check DCLONE_DISCORD_CHANNEL_ID')
-            await self.close()
-            return
-        print(f'Messages will be sent to #{channel.name} on the {channel.guild.name} server')
+
+        print(f'Dclone Messages will be sent to #{self.dc_chan.name} and TerrorZone messages will be sent to #{self.tz_chan.name} on the {self.dc_chan.guild.name} server')
 
         # start the background task to monitor dclone status
         try:
@@ -718,7 +728,6 @@ class DiscordClient(discord.Client):
         if message.author.bot:
             return
 
-        channel = message.channel  # simpler than get_channel
         content = message.content
 
         if content.startswith('!dclonesub'):
@@ -729,13 +738,13 @@ class DiscordClient(discord.Client):
             db_data[message.author.name] = message.author.id
             sub_db.write_db(db_data)
             print(f"User {message.author.name} ({message.author.id}) subscribed")
-            await channel.send(f"✅ {message.author.mention}, you’re now subscribed.")
+            await self.channel.send(f"✅ {message.author.mention}, you’re now subscribed.")
         elif content.startswith('!dclone'):
             print(f'Responding to dclone chatop from {message.author}')
-            await channel.send(self.dclone.progress_message())
+            await self.channel.send(self.dclone.progress_message())
         elif content.startswith('!tzsub'):
             view = EventSubscriptionView(user_id=message.author.id, events=EVENT_LIST)
-            await channel.send(
+            await self.channel.send(
                 "Choose what Terror Zones you would like to be notified about:",
                 view=view
             )
@@ -743,10 +752,10 @@ class DiscordClient(discord.Client):
             print(DCLONE_D2EMU_TOKEN)
             if DCLONE_D2EMU_TOKEN:
                 print(f'Providing Terror Zone info to {message.author}')
-                await channel.send(d2emu_request(mode='user')['tz_full'])
+                await self.tz_channel.send(d2emu_request(mode='user')['tz_full'])
             elif DCLONE_D2RW_TOKEN:
                 print(f'Providing Terror Zone info to {message.author}')
-                await channel.send(D2RuneWizardClient.terror_zone(mode='user'))
+                await self.channel.send(D2RuneWizardClient.terror_zone(mode='user'))
 
         elif content.startswith('!roll'):
             parts = content.split()
@@ -756,13 +765,13 @@ class DiscordClient(discord.Client):
                 top = 6
             roll = randint(1, top)
             print(f'Providing random roll to {message.author}')
-            await channel.send(f'{message.author.mention} rolled: {roll}')
+            await self.channel.send(f'{message.author.mention} rolled: {roll}')
         elif content.startswith('!myid'):
             print(f"User: {message.author.name}, ID: {message.author.id}")
-            await channel.send(f"Your Discord ID is `{message.author.id}`")
+            await self.channel.send(f"Your Discord ID is `{message.author.id}`")
 
         elif content.startswith('!help'):
-            await channel.send(
+            await self.channel.send(
                 '**Commands**\n'
                 '`!dclone` – show current DClone status\n'
                 '`!tz` – show Terror Zone info\n'
@@ -816,9 +825,7 @@ class DiscordClient(discord.Client):
                 mentions = ' '.join([f'<@{uid}>' for uid in user_ids_to_ping])
                 message = f'[{progress}/6] {emoji} **{REGION[region]} {LADDER[ladder]} {HC[hardcore]}** DClone progressed (reporter_id: {reporter_id})'
                 message += '\n> Data courtesy of diablo2.io'
-
-                channel = self.get_channel(DCLONE_DISCORD_CHANNEL_ID)
-                await channel.send(f'{message}\n{mentions}')
+                await self.channel.send(f'{message}\n{mentions}')
 
                 # update current status
                 self.dclone.current_progress[(region, ladder, hardcore)] = progress
@@ -834,8 +841,7 @@ class DiscordClient(discord.Client):
                     message += f'[{progress}/6] **{REGION[region]} {LADDER[ladder]} {HC[hardcore]}** DClone may have spawned (reporter_id: {reporter_id})'
                     message += '\n> Data courtesy of diablo2.io'
 
-                    channel = self.get_channel(DCLONE_DISCORD_CHANNEL_ID)
-                    await channel.send(message)
+                    await self.channel.send(message)
 
                 # update current status
                 self.dclone.current_progress[(region, ladder, hardcore)] = progress
@@ -847,7 +853,6 @@ class DiscordClient(discord.Client):
 
         # check for upcoming walks using the D2RuneWizard API
         if DCLONE_D2RW_TOKEN or DCLONE_D2EMU_TOKEN:
-            channel = self.get_channel(DCLONE_DISCORD_CHANNEL_ID)
             try:
                 response = get(
                     f'https://d2runewizard.com/api/diablo-clone-progress/planned-walks?token={DCLONE_D2RW_TOKEN}',
@@ -875,9 +880,7 @@ class DiscordClient(discord.Client):
                         message = f'{emoji} Upcoming walk for **{region} {LADDER_RW[ladder]} {HC_RW[hardcore]}** '
                         message += f'starts at <t:{timestamp}:f> (reported by `{name}`){unconfirmed}'
                         message += '\n> Data courtesy of d2runewizard.com'
-
-                        channel = self.get_channel(DCLONE_DISCORD_CHANNEL_ID)
-                        await channel.send(message)
+                        await self.channel.send(message)
 
                         self.dclone.alerted_walks.append(walk_id)
             except Exception as err:
@@ -887,17 +890,17 @@ class DiscordClient(discord.Client):
             this_hour = datetime.now()
             if last_update and last_update.hour == this_hour.hour and last_update.date() == this_hour.date():
                 if this_hour.minute >= 10 and emu_five and DCLONE_D2EMU_TOKEN:
-                    await channel.send(f'{d2emu_request(mode="auto")["tz_part"]["next"]}')
+                    await self.tz_channel.send(f'{d2emu_request(mode="auto")["tz_part"]["next"]}')
                     emu_five = False
                 pass
             else:
                 if DCLONE_D2EMU_TOKEN:
                     await asyncio.sleep(5)
-                    await channel.send(f'{d2emu_request(mode="auto")["tz_part"]["current"]}')
+                    await self.tz_channel.send(f'{d2emu_request(mode="auto")["tz_part"]["current"]}')
                     emu_five = True
                 elif DCLONE_D2RW_TOKEN:
                     await asyncio.sleep(160)
-                    await channel.send(f'{D2RuneWizardClient.terror_zone(mode="auto")}')
+                    await self.tz_channel.send(f'{D2RuneWizardClient.terror_zone(mode="auto")}')
                 last_update = datetime.now()
 
     @check_dclone_status.before_loop
